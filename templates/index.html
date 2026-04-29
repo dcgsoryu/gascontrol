@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🔥 GasControl</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #1a73e8;
+    --primary-dark: #1557b0;
+    --success: #34a853;
+    --warning: #fbbc04;
+    --danger: #ea4335;
+    --bg: #f8f9fa;
+    --card: #ffffff;
+    --text: #202124;
+    --muted: #5f6368;
+    --border: #dadce0;
+    --radius: 12px;
+    --shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 2px rgba(0,0,0,.08);
+    --shadow-lg: 0 4px 16px rgba(0,0,0,.12);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); }
+  
+  header {
+    background: linear-gradient(135deg, var(--primary) 0%, #0d47a1 100%);
+    color: white; padding: 1rem 2rem;
+    display: flex; align-items: center; justify-content: space-between;
+    box-shadow: var(--shadow-lg); position: sticky; top: 0; z-index: 100;
+  }
+  header h1 { font-size: 1.5rem; font-weight: 700; }
+  header .subtitle { font-size: .85rem; opacity: .8; }
+  
+  .container { max-width: 1200px; margin: 0 auto; padding: 1.5rem; }
+  
+  .card {
+    background: var(--card); border-radius: var(--radius);
+    box-shadow: var(--shadow); padding: 1.5rem; margin-bottom: 1.5rem;
+  }
+  .card h2 { font-size: 1.1rem; font-weight: 600; color: var(--primary); margin-bottom: 1rem;
+    display: flex; align-items: center; gap: .5rem; }
+  
+  /* Resumen */
+  .resumen-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+  .kpi {
+    background: linear-gradient(135deg, var(--bg), white);
+    border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 1.2rem; text-align: center;
+  }
+  .kpi .label { font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+  .kpi .value { font-size: 1.8rem; font-weight: 700; color: var(--primary); margin: .3rem 0; }
+  .kpi .unit { font-size: .8rem; color: var(--muted); }
+  
+  /* Forms */
+  .form-group { margin-bottom: 1rem; }
+  label { display: block; font-size: .85rem; font-weight: 600; color: var(--muted); margin-bottom: .4rem; }
+  input, select, textarea {
+    width: 100%; padding: .65rem 1rem; border: 1.5px solid var(--border);
+    border-radius: 8px; font-size: .95rem; outline: none; transition: border .2s;
+    background: white;
+  }
+  input:focus, select:focus, textarea:focus { border-color: var(--primary); }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  
+  /* Buttons */
+  .btn {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .65rem 1.2rem; border-radius: 8px; font-size: .9rem; font-weight: 600;
+    cursor: pointer; border: none; transition: all .15s; text-decoration: none;
+  }
+  .btn-primary { background: var(--primary); color: white; }
+  .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+  .btn-success { background: var(--success); color: white; }
+  .btn-success:hover { background: #2d9249; }
+  .btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--text); }
+  .btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+  .btn-danger { background: var(--danger); color: white; font-size: .8rem; padding: .35rem .7rem; }
+  .btn-sm { padding: .4rem .8rem; font-size: .82rem; }
+  .btn-group { display: flex; flex-wrap: wrap; gap: .5rem; }
+  
+  /* Filter bar */
+  .filter-bar {
+    display: flex; align-items: flex-end; gap: 1rem; flex-wrap: wrap;
+    padding: 1rem; background: var(--bg); border-radius: 10px; margin-bottom: 1rem;
+  }
+  .filter-bar .form-group { margin: 0; flex: 1; min-width: 150px; }
+  
+  /* Charts */
+  .chart-container { position: relative; height: 300px; }
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+  @media (max-width: 700px) { .charts-grid { grid-template-columns: 1fr; } }
+  
+  /* Table */
+  .table-wrapper { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  thead th {
+    background: var(--primary); color: white; padding: .7rem 1rem;
+    text-align: left; font-weight: 600; white-space: nowrap;
+  }
+  tbody tr { border-bottom: 1px solid var(--border); transition: background .1s; }
+  tbody tr:hover { background: #f0f7ff; }
+  tbody td { padding: .65rem 1rem; }
+  .badge {
+    display: inline-block; padding: .2rem .6rem; border-radius: 20px;
+    font-size: .75rem; font-weight: 600;
+  }
+  .badge-green { background: #e6f4ea; color: var(--success); }
+  .badge-blue { background: #e8f0fe; color: var(--primary); }
+  
+  /* Pagination */
+  .pagination { display: flex; align-items: center; gap: .5rem; justify-content: space-between; margin-top: 1rem; }
+  .pagination select { width: auto; padding: .4rem .8rem; }
+  .page-info { color: var(--muted); font-size: .85rem; }
+  
+  /* Config section */
+  .config-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+  
+  /* Alerts */
+  .alert {
+    padding: .8rem 1rem; border-radius: 8px; margin-bottom: 1rem;
+    font-size: .9rem; display: none;
+  }
+  .alert-success { background: #e6f4ea; color: #1e7e34; border-left: 4px solid var(--success); }
+  .alert-error { background: #fce8e6; color: #c62828; border-left: 4px solid var(--danger); }
+  .alert-info { background: #e8f0fe; color: #1a73e8; border-left: 4px solid var(--primary); }
+  
+  /* Import zone */
+  .drop-zone {
+    border: 2px dashed var(--border); border-radius: 10px;
+    padding: 1.5rem; text-align: center; color: var(--muted);
+    cursor: pointer; transition: all .2s;
+  }
+  .drop-zone:hover, .drop-zone.dragover { border-color: var(--primary); background: #e8f0fe; }
+  
+  /* Spinner */
+  .spinner {
+    display: inline-block; width: 16px; height: 16px;
+    border: 2.5px solid rgba(255,255,255,.4); border-top-color: white;
+    border-radius: 50%; animation: spin .6s linear infinite; vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  
+  .precio-chip {
+    display: inline-flex; align-items: center; gap: .4rem;
+    background: #e8f0fe; color: var(--primary); border-radius: 20px;
+    padding: .3rem .9rem; font-weight: 700; font-size: 1rem;
+  }
+
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr; }
+    header { flex-direction: column; align-items: flex-start; gap: .3rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🔥 GasControl</h1>
+    <div class="subtitle">Control de consumo de gas doméstico · TUR2</div>
+  </div>
+  <div id="precioChip" class="precio-chip" title="Precio kWh actual">
+    💶 <span id="headerPrecio">cargando...</span>
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- RESUMEN -->
+  <div class="card">
+    <h2>📊 Resumen General</h2>
+    <div class="resumen-grid">
+      <div class="kpi">
+        <div class="label">Última Lectura</div>
+        <div class="value" id="kpiUltima">—</div>
+        <div class="unit" id="kpiUltimaFecha">—</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Consumo Total</div>
+        <div class="value" id="kpiConsumoM3">0.00</div>
+        <div class="unit">m³ · <span id="kpiConsumoKwh">0.00</span> kWh</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Coste Total</div>
+        <div class="value" id="kpiCoste">0.00</div>
+        <div class="unit">€ estimado</div>
+      </div>
+      <div class="kpi">
+        <div class="label">Precio Actual (kWh)</div>
+        <div class="value" id="kpiPrecio">—</div>
+        <div class="unit">€/kWh · TUR2</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NUEVA LECTURA + CONFIG -->
+  <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem;" class="two-col">
+    
+    <div class="card">
+      <h2>📝 Introducir Nueva Lectura</h2>
+      <div id="alertLectura" class="alert"></div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>📅 Fecha y Hora *</label>
+          <input type="datetime-local" id="inputFecha">
+        </div>
+        <div class="form-group">
+          <label>🔢 Valor del Contador (m³) *</label>
+          <input type="number" id="inputValor" placeholder="Ej: 15432.50" step="0.01" min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>💬 Nota (opcional)</label>
+        <input type="text" id="inputNota" placeholder="Ej: Lectura fin de mes, cambio de tarifa...">
+      </div>
+      <div class="form-group">
+        <label>💶 Precio kWh para esta lectura (opcional)</label>
+        <input type="number" id="inputPrecioLectura" placeholder="Dejar vacío = usar precio configurado" step="0.0001" min="0">
+      </div>
+      <button class="btn btn-primary" onclick="guardarLectura()">
+        💾 Guardar Lectura
+      </button>
+    </div>
+
+    <div class="card">
+      <h2>⚙️ Configuración</h2>
+      <div id="alertConfig" class="alert"></div>
+      <div class="config-grid">
+        <div class="form-group">
+          <label>🌡️ Factor de conversión m³→kWh</label>
+          <input type="number" id="cfgFactor" step="0.01" placeholder="10.23">
+        </div>
+        <div class="form-group">
+          <label>📋 Cuota fija mensual (€)</label>
+          <input type="number" id="cfgCuota" step="0.01" placeholder="10.50">
+        </div>
+        <div class="form-group">
+          <label>💶 Precio kWh manual (€)</label>
+          <input type="number" id="cfgPrecio" step="0.0001" placeholder="0.0650">
+        </div>
+        <div class="form-group">
+          <label>🏷️ Tarifa</label>
+          <select id="cfgTarifa">
+            <option value="TUR1">TUR1</option>
+            <option value="TUR2" selected>TUR2</option>
+            <option value="TUR3">TUR3</option>
+          </select>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-outline" onclick="obtenerPrecioTUR()">🌐 Obtener Precio TUR</button>
+        <button class="btn btn-success" onclick="guardarConfig()">💾 Guardar Config</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTRO FECHAS (compartido gráficas + historial) -->
+  <div class="card">
+    <h2>🗓️ Filtro de Período</h2>
+    <div class="filter-bar">
+      <div class="form-group">
+        <label>Desde</label>
+        <input type="date" id="filterDesde">
+      </div>
+      <div class="form-group">
+        <label>Hasta</label>
+        <input type="date" id="filterHasta">
+      </div>
+      <button class="btn btn-primary" onclick="aplicarFiltro()">🔍 Aplicar</button>
+      <button class="btn btn-outline" onclick="limpiarFiltro()">✕ Limpiar (2 años)</button>
+    </div>
+  </div>
+
+  <!-- GRÁFICAS -->
+  <div class="charts-grid">
+    <div class="card">
+      <h2>📈 Consumo (m³ y kWh)</h2>
+      <div class="chart-container">
+        <canvas id="chartConsumo"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <h2>💶 Gasto estimado (€)</h2>
+      <div class="chart-container">
+        <canvas id="chartGasto"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- EXPORT / IMPORT -->
+  <div class="card">
+    <h2>📤 Exportar / Importar Datos</h2>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:1.5rem;">
+      <div>
+        <p style="color:var(--muted);font-size:.88rem;margin-bottom:.8rem;">Exportar datos del período seleccionado en el filtro:</p>
+        <div class="btn-group">
+          <a class="btn btn-outline" id="btnExportCSV" href="/api/export/csv" download>📄 CSV</a>
+          <button class="btn btn-outline" onclick="exportPDF()">📊 PDF</button>
+          <a class="btn btn-outline" href="/api/export/sql" download>💾 Backup SQL</a>
+          <a class="btn btn-outline" href="/api/export/template" download>📋 Plantilla CSV</a>
+        </div>
+      </div>
+      <div>
+        <p style="color:var(--muted);font-size:.88rem;margin-bottom:.8rem;">Importar lecturas desde CSV:</p>
+        <div id="alertImport" class="alert"></div>
+        <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+          <div id="dropText">📁 Arrastra un CSV aquí o haz clic para seleccionar</div>
+        </div>
+        <input type="file" id="fileInput" accept=".csv" style="display:none" onchange="handleFileSelect(this)">
+        <br>
+        <button class="btn btn-primary" onclick="importarCSV()" id="btnImport" disabled>
+          🚀 Validar e Importar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div class="card">
+    <h2>📋 Historial de Lecturas</h2>
+    <div class="table-wrapper">
+      <table id="tablaLecturas">
+        <thead>
+          <tr>
+            <th>Fecha</th>
+            <th>Contador (m³)</th>
+            <th>Consumo (m³)</th>
+            <th>Consumo (kWh)</th>
+            <th>Coste (€)</th>
+            <th>Nota</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="tbodyLecturas">
+          <tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem;">Cargando...</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="pagination">
+      <div style="display:flex;align-items:center;gap:.5rem;">
+        <span style="font-size:.85rem;color:var(--muted);">Mostrar:</span>
+        <select id="pageSize" onchange="cambiarPagina(1)" style="width:auto">
+          <option value="10">10</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+        <span style="font-size:.85rem;color:var(--muted);">por página</span>
+      </div>
+      <div class="page-info" id="pageInfo"></div>
+      <div style="display:flex;gap:.5rem;">
+        <button class="btn btn-outline btn-sm" id="btnPrev" onclick="cambiarPagina(currentPage-1)">← Ant.</button>
+        <button class="btn btn-outline btn-sm" id="btnNext" onclick="cambiarPagina(currentPage+1)">Sig. →</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<style>
+@media(max-width:700px) { .two-col { grid-template-columns: 1fr !important; } }
+</style>
+
+<script>
+// ─────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────
+let currentPage = 1;
+let totalLecturas = 0;
+let chartConsumo = null;
+let chartGasto = null;
+let selectedFile = null;
+
+// ─────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  // Set default datetime to now
+  const now = new Date();
+  now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+  document.getElementById('inputFecha').value = now.toISOString().slice(0,16);
+
+  cargarConfig();
+  cargarResumen();
+  cargarGraficas();
+  cargarLecturas();
+  setupDragDrop();
+});
+
+// ─────────────────────────────────────────────
+// HELPERS
+// ─────────────────────────────────────────────
+function showAlert(id, msg, type='success') {
+  const el = document.getElementById(id);
+  el.className = `alert alert-${type}`;
+  el.textContent = msg;
+  el.style.display = 'block';
+  setTimeout(() => el.style.display = 'none', 4000);
+}
+
+function fmtFecha(s) {
+  if (!s) return '—';
+  return s.slice(0,16).replace('T',' ');
+}
+
+function getFilterParams() {
+  const d = document.getElementById('filterDesde').value;
+  const h = document.getElementById('filterHasta').value;
+  let p = '';
+  if (d) p += `&desde=${d}`;
+  if (h) p += `&hasta=${h}`;
+  return p;
+}
+
+// ─────────────────────────────────────────────
+// CONFIG
+// ─────────────────────────────────────────────
+async function cargarConfig() {
+  const r = await fetch('/api/config');
+  const cfg = await r.json();
+  document.getElementById('cfgFactor').value = cfg.factor_conversion || '10.23';
+  document.getElementById('cfgCuota').value = cfg.cuota_fija || '10.50';
+  document.getElementById('cfgPrecio').value = cfg.precio_kwh_manual || '0.0650';
+  document.getElementById('cfgTarifa').value = cfg.tarifa_tur || 'TUR2';
+  document.getElementById('kpiPrecio').textContent = parseFloat(cfg.precio_kwh_manual || 0.065).toFixed(4);
+  document.getElementById('headerPrecio').textContent = parseFloat(cfg.precio_kwh_manual || 0.065).toFixed(4) + ' €/kWh';
+}
+
+async function guardarConfig() {
+  const data = {
+    factor_conversion: parseFloat(document.getElementById('cfgFactor').value),
+    cuota_fija: parseFloat(document.getElementById('cfgCuota').value),
+    precio_kwh_manual: parseFloat(document.getElementById('cfgPrecio').value),
+    tarifa_tur: document.getElementById('cfgTarifa').value,
+  };
+  const r = await fetch('/api/config', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(data) });
+  if (r.ok) {
+    showAlert('alertConfig','✅ Configuración guardada correctamente');
+    cargarResumen();
+    cargarGraficas();
+  } else {
+    showAlert('alertConfig','❌ Error guardando configuración','error');
+  }
+}
+
+async function obtenerPrecioTUR() {
+  showAlert('alertConfig','🌐 Consultando API de precios TUR...','info');
+  document.getElementById('alertConfig').style.display='block';
+  try {
+    const r = await fetch('/api/precio-tur');
+    const data = await r.json();
+    if (data.ok && data.data) {
+      // Try to find price in response
+      const d = data.data;
+      let precio = null;
+      if (d.precio) precio = d.precio;
+      else if (d.precio_kwh) precio = d.precio_kwh;
+      else if (d.TUR2) precio = d.TUR2;
+      else if (Array.isArray(d) && d.length) precio = d[0].precio || d[0].precio_kwh;
+      
+      if (precio) {
+        document.getElementById('cfgPrecio').value = parseFloat(precio).toFixed(4);
+        showAlert('alertConfig', `✅ Precio TUR obtenido: ${parseFloat(precio).toFixed(4)} €/kWh`);
+      } else {
+        showAlert('alertConfig', '⚠️ API respondió pero no se pudo extraer el precio. Revisa manualmente. Respuesta: ' + JSON.stringify(d).slice(0,100), 'error');
+      }
+    } else {
+      showAlert('alertConfig','⚠️ No se pudo obtener el precio TUR automáticamente. Introduce el precio manualmente.','error');
+    }
+  } catch(e) {
+    showAlert('alertConfig','❌ Error conectando con la API TUR','error');
+  }
+}
+
+// ─────────────────────────────────────────────
+// LECTURAS
+// ─────────────────────────────────────────────
+async function guardarLectura() {
+  const fecha = document.getElementById('inputFecha').value;
+  const valor = parseFloat(document.getElementById('inputValor').value);
+  const nota = document.getElementById('inputNota').value;
+  const precio = document.getElementById('inputPrecioLectura').value;
+
+  if (!fecha || isNaN(valor)) {
+    showAlert('alertLectura','⚠️ Fecha y valor del contador son obligatorios','error');
+    return;
+  }
+
+  const body = { fecha: fecha.replace('T',' '), valor_contador: valor, nota: nota || null };
+  if (precio) body.precio_kwh = parseFloat(precio);
+
+  const r = await fetch('/api/lecturas', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  if (r.ok) {
+    showAlert('alertLectura','✅ Lectura guardada correctamente');
+    document.getElementById('inputValor').value = '';
+    document.getElementById('inputNota').value = '';
+    document.getElementById('inputPrecioLectura').value = '';
+    cargarResumen();
+    cargarGraficas();
+    cargarLecturas();
+  } else {
+    const err = await r.json();
+    showAlert('alertLectura','❌ Error: ' + (err.detail || 'Error desconocido'),'error');
+  }
+}
+
+async function cargarLecturas() {
+  const size = parseInt(document.getElementById('pageSize').value);
+  const offset = (currentPage - 1) * size;
+  const params = getFilterParams();
+  const r = await fetch(`/api/lecturas?limit=${size}&offset=${offset}${params}`);
+  const data = await r.json();
+  totalLecturas = data.total;
+  renderTabla(data.lecturas, size);
+}
+
+function renderTabla(lecturas, size) {
+  const tbody = document.getElementById('tbodyLecturas');
+  if (!lecturas.length) {
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:2rem;">No hay lecturas para mostrar</td></tr>';
+    document.getElementById('pageInfo').textContent = '';
+    return;
+  }
+  tbody.innerHTML = lecturas.map(l => `
+    <tr>
+      <td>${fmtFecha(l.fecha)}</td>
+      <td><strong>${l.valor_contador?.toFixed(2)}</strong> m³</td>
+      <td>${l.consumo_m3 != null ? '<span class="badge badge-blue">'+l.consumo_m3.toFixed(3)+' m³</span>' : '—'}</td>
+      <td>${l.consumo_kwh != null ? l.consumo_kwh.toFixed(2)+' kWh' : '—'}</td>
+      <td>${l.coste != null ? '<span class="badge badge-green">'+l.coste.toFixed(2)+' €</span>' : '—'}</td>
+      <td style="color:var(--muted);font-size:.82rem">${l.nota || ''}</td>
+      <td><button class="btn btn-danger btn-sm" onclick="eliminarLectura(${l.id})">🗑️</button></td>
+    </tr>
+  `).join('');
+
+  const totalPages = Math.ceil(totalLecturas / size);
+  document.getElementById('pageInfo').textContent = `Página ${currentPage} de ${totalPages} · ${totalLecturas} lecturas total`;
+  document.getElementById('btnPrev').disabled = currentPage <= 1;
+  document.getElementById('btnNext').disabled = currentPage >= totalPages;
+}
+
+function cambiarPagina(p) {
+  const size = parseInt(document.getElementById('pageSize').value);
+  const totalPages = Math.ceil(totalLecturas / size);
+  if (p < 1 || p > totalPages) return;
+  currentPage = p;
+  cargarLecturas();
+}
+
+async function eliminarLectura(id) {
+  if (!confirm('¿Eliminar esta lectura? Esta acción no se puede deshacer.')) return;
+  const r = await fetch(`/api/lecturas/${id}`, { method: 'DELETE' });
+  if (r.ok) {
+    cargarLecturas();
+    cargarResumen();
+    cargarGraficas();
+  }
+}
+
+// ─────────────────────────────────────────────
+// RESUMEN
+// ─────────────────────────────────────────────
+async function cargarResumen() {
+  const r = await fetch('/api/resumen');
+  const d = await r.json();
+  document.getElementById('kpiUltima').textContent = d.ultima_lectura ? d.ultima_lectura.valor.toFixed(2) + ' m³' : '—';
+  document.getElementById('kpiUltimaFecha').textContent = d.ultima_lectura ? fmtFecha(d.ultima_lectura.fecha) : '—';
+  document.getElementById('kpiConsumoM3').textContent = d.consumo_total_m3.toFixed(2);
+  document.getElementById('kpiConsumoKwh').textContent = d.consumo_total_kwh.toFixed(2);
+  document.getElementById('kpiCoste').textContent = d.coste_total.toFixed(2);
+  document.getElementById('kpiPrecio').textContent = parseFloat(d.precio_actual).toFixed(4);
+  document.getElementById('headerPrecio').textContent = parseFloat(d.precio_actual).toFixed(4) + ' €/kWh';
+}
+
+// ─────────────────────────────────────────────
+// GRÁFICAS
+// ─────────────────────────────────────────────
+async function cargarGraficas() {
+  const params = getFilterParams();
+  const r = await fetch('/api/grafica?' + params.replace('&',''));
+  const data = await r.json();
+
+  const colBlue = '#1a73e8';
+  const colGreen = '#34a853';
+  const colOrange = '#fbbc04';
+
+  // Chart consumo
+  if (chartConsumo) chartConsumo.destroy();
+  chartConsumo = new Chart(document.getElementById('chartConsumo'), {
+    type: 'bar',
+    data: {
+      labels: data.labels,
+      datasets: [
+        { label: 'm³', data: data.consumo_m3, backgroundColor: colBlue+'99', borderColor: colBlue, borderWidth: 1.5, yAxisID: 'y' },
+        { label: 'kWh', data: data.consumo_kwh, type: 'line', borderColor: colOrange, backgroundColor: colOrange+'33', tension: 0.3, fill: false, yAxisID: 'y2', pointRadius: 3 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' }, tooltip: { mode: 'index' } },
+      scales: {
+        y: { beginAtZero: true, title: { display: true, text: 'm³' } },
+        y2: { beginAtZero: true, position: 'right', title: { display: true, text: 'kWh' }, grid: { drawOnChartArea: false } }
+      }
+    }
+  });
+
+  // Chart gasto
+  if (chartGasto) chartGasto.destroy();
+  chartGasto = new Chart(document.getElementById('chartGasto'), {
+    type: 'bar',
+    data: {
+      labels: data.labels,
+      datasets: [
+        { label: 'Coste (€)', data: data.costes, backgroundColor: colGreen+'99', borderColor: colGreen, borderWidth: 1.5 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top' },
+        tooltip: { callbacks: { label: ctx => `${ctx.raw?.toFixed(2)} €` } }
+      },
+      scales: { y: { beginAtZero: true, title: { display: true, text: '€' } } }
+    }
+  });
+}
+
+// ─────────────────────────────────────────────
+// FILTRO
+// ─────────────────────────────────────────────
+function aplicarFiltro() {
+  currentPage = 1;
+  cargarGraficas();
+  cargarLecturas();
+}
+
+function limpiarFiltro() {
+  document.getElementById('filterDesde').value = '';
+  document.getElementById('filterHasta').value = '';
+  currentPage = 1;
+  cargarGraficas();
+  cargarLecturas();
+}
+
+// ─────────────────────────────────────────────
+// EXPORT / IMPORT
+// ─────────────────────────────────────────────
+function exportPDF() {
+  const d = document.getElementById('filterDesde').value;
+  const h = document.getElementById('filterHasta').value;
+  let url = '/api/export/pdf?';
+  if (d) url += `desde=${d}&`;
+  if (h) url += `hasta=${h}`;
+  window.open(url, '_blank');
+}
+
+function setupDragDrop() {
+  const dz = document.getElementById('dropZone');
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('dragover'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragover'));
+  dz.addEventListener('drop', e => {
+    e.preventDefault(); dz.classList.remove('dragover');
+    const file = e.dataTransfer.files[0];
+    if (file) setFile(file);
+  });
+}
+
+function handleFileSelect(input) {
+  if (input.files[0]) setFile(input.files[0]);
+}
+
+function setFile(file) {
+  selectedFile = file;
+  document.getElementById('dropText').textContent = `📄 ${file.name} (${(file.size/1024).toFixed(1)} KB)`;
+  document.getElementById('btnImport').disabled = false;
+}
+
+async function importarCSV() {
+  if (!selectedFile) return;
+  const formData = new FormData();
+  formData.append('file', selectedFile);
+  const btn = document.getElementById('btnImport');
+  btn.innerHTML = '<span class="spinner"></span> Importando...';
+  btn.disabled = true;
+  const r = await fetch('/api/import/csv', { method: 'POST', body: formData });
+  const data = await r.json();
+  btn.innerHTML = '🚀 Validar e Importar';
+  if (data.ok) {
+    let msg = `✅ ${data.imported} lecturas importadas correctamente.`;
+    if (data.errors.length) msg += ` ⚠️ ${data.errors.length} errores: ${data.errors.slice(0,3).join(', ')}`;
+    showAlert('alertImport', msg, data.errors.length ? 'error' : 'success');
+    cargarLecturas(); cargarResumen(); cargarGraficas();
+  } else {
+    showAlert('alertImport','❌ Error en la importación','error');
+  }
+  btn.disabled = false;
+  selectedFile = null;
+  document.getElementById('dropText').textContent = '📁 Arrastra un CSV aquí o haz clic para seleccionar';
+}
+</script>
+</body>
+</html>

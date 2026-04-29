@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  gascontrol:
+    build: .
+    container_name: gascontrol
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persistent data volume - survives container rebuilds
+      - gascontrol_data:/app/data
+    environment:
+      - TZ=Europe/Madrid
+    # Resource limits for Raspberry Pi 3B (1GB RAM)
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
+
+volumes:
+  gascontrol_data:
+    driver: local
