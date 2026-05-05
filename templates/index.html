@@ -274,17 +274,25 @@
   </div>
 
   <!-- GRÁFICAS -->
-  <div class="charts-grid">
-    <div class="card">
-      <h2>📈 Consumo (m³ y kWh)</h2>
-      <div class="chart-container">
-        <canvas id="chartConsumo"></canvas>
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.5rem;margin-bottom:1rem;">
+      <h2 style="margin:0">📈 Gráficas de consumo y gasto</h2>
+      <div class="btn-group" id="chartModeBtns">
+        <button class="btn btn-primary btn-sm" id="btnModeDaily" onclick="setChartMode('daily')">📅 Consumo diario (normalizado)</button>
+        <button class="btn btn-outline btn-sm" id="btnModeMonthly" onclick="setChartMode('monthly')">📆 Por mes</button>
       </div>
     </div>
-    <div class="card">
-      <h2>💶 Gasto estimado (€)</h2>
-      <div class="chart-container">
-        <canvas id="chartGasto"></canvas>
+    <div id="chartModeDesc" style="font-size:.82rem;color:var(--muted);margin-bottom:.8rem;">
+      Consumo normalizado a m³/día — permite comparar períodos de distinta duración.
+    </div>
+    <div class="charts-grid">
+      <div>
+        <div style="font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:.4rem;" id="chartConsumoTitle">m³/día y kWh/día</div>
+        <div class="chart-container"><canvas id="chartConsumo"></canvas></div>
+      </div>
+      <div>
+        <div style="font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:.4rem;" id="chartGastoTitle">€/día (gas + cuota prorrateada)</div>
+        <div class="chart-container"><canvas id="chartGasto"></canvas></div>
       </div>
     </div>
   </div>
@@ -326,6 +334,7 @@
           <tr>
             <th>Fecha</th>
             <th>Contador (m³)</th>
+            <th>Días</th>
             <th>Consumo (m³)</th>
             <th>Consumo (kWh)</th>
             <th>Coste (€)</th>
@@ -370,6 +379,7 @@ let currentPage = 1;
 let totalLecturas = 0;
 let chartConsumo = null;
 let chartGasto = null;
+let chartMode = 'daily';  // 'daily' | 'monthly'
 let selectedFile = null;
 
 // ─────────────────────────────────────────────
@@ -503,7 +513,8 @@ async function guardarLectura() {
     cargarLecturas();
   } else {
     const err = await r.json();
-    showAlert('alertLectura','❌ Error: ' + (err.detail || 'Error desconocido'),'error');
+    const tipo = r.status === 409 ? '⚠️ Duplicada' : '❌ Error de validación';
+    showAlert('alertLectura', tipo + ': ' + (err.detail || 'Error desconocido'), 'error');
   }
 }
 
@@ -528,6 +539,7 @@ function renderTabla(lecturas, size) {
     <tr>
       <td>${fmtFecha(l.fecha)}</td>
       <td><strong>${l.valor_contador?.toFixed(2)}</strong> m³</td>
+      <td style="color:var(--muted);font-size:.82rem;text-align:center">${l.dias != null ? l.dias.toFixed(0)+' d' : '—'}</td>
       <td>${l.consumo_m3 != null ? '<span class="badge badge-blue">'+l.consumo_m3.toFixed(3)+' m³</span>' : '—'}</td>
       <td>${l.consumo_kwh != null ? l.consumo_kwh.toFixed(2)+' kWh' : '—'}</td>
       <td>${l.coste != null ? '<span class="badge badge-green">'+l.coste.toFixed(2)+' €</span>' : '—'}</td>
@@ -578,55 +590,99 @@ async function cargarResumen() {
 // ─────────────────────────────────────────────
 // GRÁFICAS
 // ─────────────────────────────────────────────
-async function cargarGraficas() {
-  const params = getFilterParams();
-  const r = await fetch('/api/grafica?' + params.replace('&',''));
-  const data = await r.json();
+function setChartMode(mode) {
+  chartMode = mode;
+  document.getElementById('btnModeDaily').className   = mode==='daily'   ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+  document.getElementById('btnModeMonthly').className = mode==='monthly' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+  cargarGraficas();
+}
 
-  const colBlue = '#1a73e8';
-  const colGreen = '#34a853';
-  const colOrange = '#fbbc04';
-
-  // Chart consumo
+function makeChartConsumo(labels, dataset1, label1, unit1, dataset2, label2, unit2) {
+  const colBlue = '#1a73e8', colOrange = '#fbbc04';
   if (chartConsumo) chartConsumo.destroy();
   chartConsumo = new Chart(document.getElementById('chartConsumo'), {
     type: 'bar',
     data: {
-      labels: data.labels,
+      labels,
       datasets: [
-        { label: 'm³', data: data.consumo_m3, backgroundColor: colBlue+'99', borderColor: colBlue, borderWidth: 1.5, yAxisID: 'y' },
-        { label: 'kWh', data: data.consumo_kwh, type: 'line', borderColor: colOrange, backgroundColor: colOrange+'33', tension: 0.3, fill: false, yAxisID: 'y2', pointRadius: 3 }
+        { label: label1, data: dataset1, backgroundColor: colBlue+'99', borderColor: colBlue, borderWidth: 1.5, yAxisID: 'y' },
+        { label: label2, data: dataset2, type: 'line', borderColor: colOrange, backgroundColor: colOrange+'22',
+          tension: 0.3, fill: true, yAxisID: 'y2', pointRadius: 2, borderWidth: 2 }
       ]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { position: 'top' }, tooltip: { mode: 'index' } },
+      plugins: { legend: { position: 'top' }, tooltip: { mode: 'index', intersect: false } },
       scales: {
-        y: { beginAtZero: true, title: { display: true, text: 'm³' } },
-        y2: { beginAtZero: true, position: 'right', title: { display: true, text: 'kWh' }, grid: { drawOnChartArea: false } }
+        x: { ticks: { maxRotation: 45, font: { size: 10 } } },
+        y:  { beginAtZero: true, title: { display: true, text: unit1 } },
+        y2: { beginAtZero: true, position: 'right', title: { display: true, text: unit2 },
+              grid: { drawOnChartArea: false } }
       }
     }
   });
+}
 
-  // Chart gasto
+function makeChartGasto(labels, costes, yLabel) {
+  const colGreen = '#34a853';
   if (chartGasto) chartGasto.destroy();
   chartGasto = new Chart(document.getElementById('chartGasto'), {
     type: 'bar',
     data: {
-      labels: data.labels,
-      datasets: [
-        { label: 'Coste (€)', data: data.costes, backgroundColor: colGreen+'99', borderColor: colGreen, borderWidth: 1.5 }
-      ]
+      labels,
+      datasets: [{ label: yLabel, data: costes, backgroundColor: colGreen+'99', borderColor: colGreen, borderWidth: 1.5 }]
     },
     options: {
       responsive: true, maintainAspectRatio: false,
       plugins: {
         legend: { position: 'top' },
-        tooltip: { callbacks: { label: ctx => `${ctx.raw?.toFixed(2)} €` } }
+        tooltip: { callbacks: { label: ctx => `${ctx.raw?.toFixed(4)} €` } }
       },
-      scales: { y: { beginAtZero: true, title: { display: true, text: '€' } } }
+      scales: {
+        x: { ticks: { maxRotation: 45, font: { size: 10 } } },
+        y: { beginAtZero: true, title: { display: true, text: yLabel } }
+      }
     }
   });
+}
+
+async function cargarGraficas() {
+  const params = getFilterParams().replace('&','');
+
+  if (chartMode === 'daily') {
+    document.getElementById('chartModeDesc').textContent =
+      'Consumo normalizado a m³/día — permite comparar períodos de distinta duración independientemente del tiempo entre lecturas.';
+    document.getElementById('chartConsumoTitle').textContent = 'm³/día  ·  kWh/día';
+    document.getElementById('chartGastoTitle').textContent   = '€/día (gas + cuota prorrateada)';
+
+    const r = await fetch('/api/grafica/diario?' + params);
+    const data = await r.json();
+    if (!data.labels.length) {
+      ['chartConsumo','chartGasto'].forEach(id => {
+        if (id==='chartConsumo' && chartConsumo) { chartConsumo.destroy(); chartConsumo=null; }
+        if (id==='chartGasto'   && chartGasto)   { chartGasto.destroy();   chartGasto=null; }
+      });
+      return;
+    }
+    makeChartConsumo(data.labels, data.m3_dia, 'm³/día', 'm³/día', data.kwh_dia, 'kWh/día', 'kWh/día');
+    makeChartGasto(data.labels, data.coste_dia, '€/día');
+
+  } else {
+    document.getElementById('chartModeDesc').textContent =
+      'Consumo agregado por mes natural — el consumo de períodos que cruzan varios meses se distribuye proporcionalmente por días.';
+    document.getElementById('chartConsumoTitle').textContent = 'm³/mes  ·  kWh/mes';
+    document.getElementById('chartGastoTitle').textContent   = '€/mes estimado';
+
+    const r = await fetch('/api/grafica/mensual?' + params);
+    const data = await r.json();
+    if (!data.labels.length) {
+      if (chartConsumo) { chartConsumo.destroy(); chartConsumo=null; }
+      if (chartGasto)   { chartGasto.destroy();   chartGasto=null; }
+      return;
+    }
+    makeChartConsumo(data.labels, data.consumo_m3, 'm³', 'm³/mes', data.consumo_kwh, 'kWh', 'kWh/mes');
+    makeChartGasto(data.labels, data.costes, '€/mes');
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -690,15 +746,22 @@ async function importarCSV() {
   const data = await r.json();
   btn.innerHTML = '🚀 Validar e Importar';
   if (data.ok) {
-    let msg = `✅ ${data.imported} lecturas importadas correctamente.`;
-    if (data.errors.length) msg += ` ⚠️ ${data.errors.length} errores: ${data.errors.slice(0,3).join(', ')}`;
-    showAlert('alertImport', msg, data.errors.length ? 'error' : 'success');
+    let msg = `✅ ${data.imported} lecturas importadas.`;
+    if (data.skipped_duplicates) msg += ` ⏭️ ${data.skipped_duplicates} duplicadas omitidas.`;
+    const hasErrors = data.errors && data.errors.length > 0;
+    if (hasErrors) {
+      msg += `\n⚠️ ${data.errors.length} lectura(s) rechazada(s) por incoherencia:\n` + data.errors.slice(0,5).join('\n');
+    }
+    showAlert('alertImport', msg, hasErrors ? 'error' : 'success');
     cargarLecturas(); cargarResumen(); cargarGraficas();
   } else {
     showAlert('alertImport','❌ Error en la importación','error');
   }
+  btn.innerHTML = '🚀 Validar e Importar';
   btn.disabled = false;
   selectedFile = null;
+  const fi = document.getElementById('fileInput');
+  fi.value = '';
   document.getElementById('dropText').textContent = '📁 Arrastra un CSV aquí o haz clic para seleccionar';
 }
 </script>
