@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GasControl — Acceso</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#1a73e8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GasControl">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, #0d47a1 0%, #1a73e8 60%, #34a853 100%);
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 1rem;
+  }
+  .card {
+    background: white; border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,.2);
+    padding: 2.5rem 2rem; width: 100%; max-width: 380px;
+    text-align: center;
+  }
+  .logo { font-size: 3.5rem; margin-bottom: .5rem; }
+  h1 { font-size: 1.6rem; font-weight: 700; color: #1a73e8; margin-bottom: .25rem; }
+  .subtitle { font-size: .85rem; color: #5f6368; margin-bottom: 2rem; }
+  .form-group { margin-bottom: 1rem; text-align: left; }
+  label { display: block; font-size: .8rem; font-weight: 600; color: #5f6368;
+    text-transform: uppercase; letter-spacing: .05em; margin-bottom: .4rem; }
+  input {
+    width: 100%; padding: .75rem 1rem;
+    border: 1.5px solid #dadce0; border-radius: 8px;
+    font-size: 1rem; outline: none; transition: border .2s;
+  }
+  input:focus { border-color: #1a73e8; }
+  .btn {
+    width: 100%; padding: .85rem; border: none; border-radius: 8px;
+    background: #1a73e8; color: white; font-size: 1rem; font-weight: 600;
+    cursor: pointer; transition: background .15s; margin-top: .5rem;
+  }
+  .btn:hover { background: #1557b0; }
+  .error {
+    background: #fce8e6; color: #c62828;
+    border-left: 4px solid #ea4335; border-radius: 6px;
+    padding: .7rem 1rem; font-size: .88rem;
+    margin-bottom: 1rem; text-align: left;
+  }
+  .footer { margin-top: 1.5rem; font-size: .75rem; color: #9aa0a6; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">🔥</div>
+  <h1>GasControl</h1>
+  <p class="subtitle">Control de consumo de gas doméstico</p>
+
+  {% if error %}
+  <div class="error">⚠️ {{ error }}</div>
+  {% endif %}
+
+  <form method="POST" action="/login">
+    <div class="form-group">
+      <label>Usuario</label>
+      <input type="text" name="username" autocomplete="username"
+             placeholder="admin" required autofocus>
+    </div>
+    <div class="form-group">
+      <label>Contraseña</label>
+      <input type="password" name="password" autocomplete="current-password"
+             placeholder="••••••••" required>
+    </div>
+    <button type="submit" class="btn">🔐 Entrar</button>
+  </form>
+
+  <div class="footer">Sesión válida 30 días · Solo uso doméstico</div>
+</div>
+</body>
+</html>

@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>🔥 GasControl</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#1a73e8">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="GasControl">
+<link rel="apple-touch-icon" href="/static/icons/icon-192.png">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
 <style>
   :root {
@@ -161,8 +167,15 @@
     <h1>🔥 GasControl</h1>
     <div class="subtitle">Control de consumo de gas doméstico · TUR2</div>
   </div>
-  <div id="precioChip" class="precio-chip" title="Precio kWh actual">
-    💶 <span id="headerPrecio">cargando...</span>
+  <div style="display:flex;align-items:center;gap:1rem;">
+    <div id="precioChip" class="precio-chip" title="Precio kWh actual">
+      💶 <span id="headerPrecio">cargando...</span>
+    </div>
+    <form method="POST" action="/logout" style="margin:0">
+      <button type="submit" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:white;padding:.4rem .9rem;border-radius:8px;cursor:pointer;font-size:.82rem;font-weight:600;">
+        🔓 Salir
+      </button>
+    </form>
   </div>
 </header>
 
@@ -763,6 +776,15 @@ async function importarCSV() {
   const fi = document.getElementById('fileInput');
   fi.value = '';
   document.getElementById('dropText').textContent = '📁 Arrastra un CSV aquí o haz clic para seleccionar';
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js')
+      .then(r => console.log('SW registered:', r.scope))
+      .catch(e => console.log('SW error:', e));
+  });
 }
 </script>
 </body>

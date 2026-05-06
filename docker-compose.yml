@@ -1,18 +1,20 @@
 version: "3.8"
 
 services:
+
   gascontrol:
     build: .
     container_name: gascontrol
     restart: unless-stopped
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     volumes:
-      # Persistent data volume - survives container rebuilds
       - gascontrol_data:/app/data
     environment:
       - TZ=Europe/Madrid
-    # Resource limits for Raspberry Pi 3B (1GB RAM)
+      - SECRET_KEY=${SECRET_KEY}
+      - APP_USER=${APP_USER}
+      - APP_PASSWORD=${APP_PASSWORD}
     deploy:
       resources:
         limits:
@@ -20,6 +22,35 @@ services:
         reservations:
           memory: 64M
 
+  nginx:
+    image: nginx:alpine
+    container_name: gascontrol_nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/templates/default.conf.template:ro
+      - certbot_certs:/etc/letsencrypt:ro
+      - certbot_www:/var/www/certbot:ro
+    environment:
+      - DOMAIN=${DOMAIN}
+    depends_on:
+      - gascontrol
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+  certbot:
+    image: certbot/certbot:latest
+    container_name: gascontrol_certbot
+    volumes:
+      - certbot_certs:/etc/letsencrypt
+      - certbot_www:/var/www/certbot
+    entrypoint: "/bin/sh -c 'trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done;'"
+
 volumes:
   gascontrol_data:
-    driver: local
+  certbot_certs:
+  certbot_www:

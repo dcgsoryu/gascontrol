@@ -1,11 +1,12 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Query, Depends, Form, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import StreamingResponse, HTMLResponse
+from fastapi.responses import StreamingResponse, HTMLResponse, RedirectResponse
 from fastapi.requests import Request
+from fastapi.middleware.sessions import SessionMiddleware
 from pydantic import BaseModel
 from typing import Optional
-import sqlite3, csv, io, httpx, os
+import sqlite3, csv, io, httpx, os, hashlib, hmac
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -16,8 +17,50 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, 
 app = FastAPI(title="GasControl")
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH  = os.path.join(BASE_DIR, "data", "gascontrol.db")
+
+# ── AUTH CONFIG ─────────────────────────────────────────────────────────────
+SECRET_KEY   = os.environ.get("SECRET_KEY", "dev-secret-change-in-production")
+APP_USER     = os.environ.get("APP_USER", "admin")
+APP_PASSWORD = os.environ.get("APP_PASSWORD", "admin")
+
+app.add_middleware(SessionMiddleware, secret_key=SECRET_KEY, max_age=86400 * 30)  # 30 days
+
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response as StarletteResponse
+
+class AuthMiddleware(BaseHTTPMiddleware):
+    OPEN_PATHS = {"/login", "/static", "/.well-known"}
+    async def dispatch(self, request: Request, call_next):
+        path = request.url.path
+        # Allow open paths
+        if any(path.startswith(p) for p in self.OPEN_PATHS):
+            return await call_next(request)
+        # Allow POST to /login
+        if path == "/login" and request.method == "POST":
+            return await call_next(request)
+        # Check session
+        if not request.session.get("authenticated"):
+            if path.startswith("/api/"):
+                return StarletteResponse('{"detail":"No autenticado"}', status_code=401,
+                                         media_type="application/json")
+            return RedirectResponse("/login", status_code=302)
+        return await call_next(request)
+
+app.add_middleware(AuthMiddleware)
+
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+
+# ── AUTH HELPERS ────────────────────────────────────────────────────────────
+def verify_password(plain: str, stored: str) -> bool:
+    return hmac.compare_digest(plain, stored)
+
+def require_auth(request: Request):
+    if not request.session.get("authenticated"):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="No autenticado")
+
+def is_authenticated(request: Request) -> bool:
+    return bool(request.session.get("authenticated"))
 
 # ── DB ─────────────────────────────────────────────────────────────────────
 def get_db():
@@ -145,8 +188,31 @@ def build_periodos(rows, factor_d, precio_d, cuota_d):
     return result
 
 # ── ROUTES ───────────────────────────────────────────────────────────────────
+# ── AUTH ROUTES ─────────────────────────────────────────────────────────────
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    if is_authenticated(request):
+        return RedirectResponse("/", status_code=302)
+    error = request.session.pop("login_error", None)
+    return templates.TemplateResponse("login.html", {"request": request, "error": error})
+
+@app.post("/login")
+async def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
+    if username == APP_USER and verify_password(password, APP_PASSWORD):
+        request.session["authenticated"] = True
+        return RedirectResponse("/", status_code=302)
+    request.session["login_error"] = "Usuario o contraseña incorrectos"
+    return RedirectResponse("/login", status_code=302)
+
+@app.post("/logout")
+async def logout(request: Request):
+    request.session.clear()
+    return RedirectResponse("/login", status_code=302)
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
+    if not is_authenticated(request):
+        return RedirectResponse("/login", status_code=302)
     return templates.TemplateResponse("index.html", {"request": request})
 
 @app.get("/api/config")
