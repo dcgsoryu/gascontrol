@@ -9,6 +9,8 @@ from starlette.responses import Response as StarletteResponse
 from pydantic import BaseModel
 from typing import Optional
 import sqlite3, csv, io, httpx, os, hashlib, hmac
+from dotenv import load_dotenv
+load_dotenv()
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
@@ -81,7 +83,7 @@ def init_db():
         created_at TEXT DEFAULT (datetime('now')),
         UNIQUE(fecha, valor_contador))""")
     # migration: add UNIQUE if missing
-    indexes = [r[2] for r in c.execute("PRAGMA index_list(lecturas)").fetchall()]
+    indexes = [r["name"] for r in c.execute("PRAGMA index_list(lecturas)").fetchall()]
     if not any("sqlite_autoindex" in i.lower() for i in indexes):
         c.execute("ALTER TABLE lecturas RENAME TO lecturas_old")
         c.execute("""CREATE TABLE lecturas (
