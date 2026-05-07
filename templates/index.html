@@ -171,11 +171,9 @@
     <div id="precioChip" class="precio-chip" title="Precio kWh actual">
       💶 <span id="headerPrecio">cargando...</span>
     </div>
-    <form method="POST" action="/logout" style="margin:0">
-      <button type="submit" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:white;padding:.4rem .9rem;border-radius:8px;cursor:pointer;font-size:.82rem;font-weight:600;">
-        🔓 Salir
-      </button>
-    </form>
+    <a href="/logout" style="background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.4);color:white;padding:.4rem .9rem;border-radius:8px;cursor:pointer;font-size:.82rem;font-weight:600;text-decoration:none;">
+      🔓 Salir
+    </a>
   </div>
 </header>
 
@@ -339,6 +337,12 @@
   </div>
 
   <!-- HISTORIAL -->
+  <!-- RESUMEN PERÍODO FILTRADO -->
+  <div id="resumenPeriodo" class="card" style="display:none;border-left:4px solid var(--primary);">
+    <h2>📊 Resumen del período filtrado</h2>
+    <div class="resumen-grid" id="resumenPeriodoGrid"></div>
+  </div>
+
   <div class="card">
     <h2>📋 Historial de Lecturas</h2>
     <div class="table-wrapper">
@@ -539,6 +543,40 @@ async function cargarLecturas() {
   const data = await r.json();
   totalLecturas = data.total;
   renderTabla(data.lecturas, size);
+  renderResumenPeriodo(data.resumen_periodo, params);
+}
+
+function renderResumenPeriodo(rp, params) {
+  const box = document.getElementById('resumenPeriodo');
+  const grid = document.getElementById('resumenPeriodoGrid');
+  // Only show if there is an active filter AND data
+  if (!params || params === '' || !rp) {
+    box.style.display = 'none';
+    return;
+  }
+  box.style.display = 'block';
+  grid.innerHTML = `
+    <div class="kpi">
+      <div class="label">Consumo período</div>
+      <div class="value">${rp.consumo_m3.toFixed(2)}</div>
+      <div class="unit">m³</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Consumo kWh</div>
+      <div class="value">${rp.consumo_kwh.toFixed(2)}</div>
+      <div class="unit">kWh</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Gasto estimado</div>
+      <div class="value">${rp.coste.toFixed(2)}</div>
+      <div class="unit">€ (incl. cuota prorr.)</div>
+    </div>
+    <div class="kpi">
+      <div class="label">Períodos</div>
+      <div class="value">${rp.num_periodos}</div>
+      <div class="unit">lecturas con consumo</div>
+    </div>
+  `;
 }
 
 function renderTabla(lecturas, size) {
@@ -710,6 +748,7 @@ function aplicarFiltro() {
 function limpiarFiltro() {
   document.getElementById('filterDesde').value = '';
   document.getElementById('filterHasta').value = '';
+  document.getElementById('resumenPeriodo').style.display = 'none';
   currentPage = 1;
   cargarGraficas();
   cargarLecturas();
