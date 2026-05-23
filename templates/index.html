@@ -291,6 +291,7 @@
       <div class="btn-group" id="chartModeBtns">
         <button class="btn btn-primary btn-sm" id="btnModeDaily" onclick="setChartMode('daily')">📅 Consumo diario (normalizado)</button>
         <button class="btn btn-outline btn-sm" id="btnModeMonthly" onclick="setChartMode('monthly')">📆 Por mes</button>
+        <button class="btn btn-outline btn-sm" id="btnModeCalendar" onclick="setChartMode('calendar')">🗓️ Día a día</button>
       </div>
     </div>
     <div id="chartModeDesc" style="font-size:.82rem;color:var(--muted);margin-bottom:.8rem;">
@@ -645,6 +646,7 @@ function setChartMode(mode) {
   chartMode = mode;
   document.getElementById('btnModeDaily').className   = mode==='daily'   ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
   document.getElementById('btnModeMonthly').className = mode==='monthly' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
+  document.getElementById('btnModeCalendar').className = mode==='calendar' ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm';
   cargarGraficas();
 }
 
@@ -713,6 +715,21 @@ async function cargarGraficas() {
         if (id==='chartConsumo' && chartConsumo) { chartConsumo.destroy(); chartConsumo=null; }
         if (id==='chartGasto'   && chartGasto)   { chartGasto.destroy();   chartGasto=null; }
       });
+      return;
+    }
+    makeChartConsumo(data.labels, data.m3_dia, 'm³/día', 'm³/día', data.kwh_dia, 'kWh/día', 'kWh/día');
+    makeChartGasto(data.labels, data.coste_dia, '€/día');
+  } else if (chartMode === 'calendar') {
+    document.getElementById('chartModeDesc').textContent =
+      'Consumo diario interpolado — cada día tiene un valor estimado entre las lecturas anterior y siguiente, aunque no haya lectura real ese día.';
+    document.getElementById('chartConsumoTitle').textContent = 'm³/día interpolado  ·  kWh/día';
+    document.getElementById('chartGastoTitle').textContent   = '€/día estimado';
+
+    const r = await fetch('/api/grafica/calendario?' + params);
+    const data = await r.json();
+    if (!data.labels.length) {
+      if (chartConsumo) { chartConsumo.destroy(); chartConsumo=null; }
+      if (chartGasto)   { chartGasto.destroy();   chartGasto=null; }
       return;
     }
     makeChartConsumo(data.labels, data.m3_dia, 'm³/día', 'm³/día', data.kwh_dia, 'kWh/día', 'kWh/día');

@@ -445,6 +445,69 @@ async def api_grafica_mensual(desde: Optional[str]=None, hasta: Optional[str]=No
         "consumo_kwh": [round(monthly_kwh[k],  2) for k in sorted_keys],
         "costes":      [round(monthly_coste[k],2) for k in sorted_keys],
     }
+@app.get("/api/grafica/calendario")
+async def api_grafica_calendario(desde: Optional[str]=None, hasta: Optional[str]=None):
+    """
+    Consumo diario por interpolación lineal entre lecturas.
+    Genera un valor para CADA día del período, haya o no lectura real.
+    """
+    from datetime import date, timedelta
+    from dateutil.relativedelta import relativedelta
+
+    conn = get_db(); cfg = get_config(conn)
+    factor   = float(cfg["factor_conversion"])
+    cuota    = float(cfg["cuota_fija"])
+    precio_d = float(cfg["precio_kwh_manual"])
+    all_rows = get_all_asc(conn); conn.close()
+
+    if len(all_rows) < 2:
+        return {"labels": [], "m3_dia": [], "kwh_dia": [], "coste_dia": []}
+
+    if not desde and not hasta:
+        date_start = (datetime.now() - relativedelta(years=2)).date()
+        date_end   = datetime.now().date()
+    else:
+        date_start = datetime.strptime(desde, "%Y-%m-%d").date() if desde else \
+                     datetime.strptime(all_rows[0]["fecha"][:10], "%Y-%m-%d").date()
+        date_end   = datetime.strptime(hasta, "%Y-%m-%d").date() if hasta else \
+                     datetime.now().date()
+
+    readings = [(datetime.strptime(r["fecha"][:10], "%Y-%m-%d").date(),
+                 r["valor_contador"],
+                 r["precio_kwh"] or precio_d,
+                 r["factor_conversion"] or factor,
+                 r["cuota_fija"] or cuota)
+                for r in all_rows]
+
+    def interpolate_daily(d):
+        before = after = None
+        for rd, rv, rp, rf, rc in readings:
+            if rd <= d: before = (rd, rv, rp, rf, rc)
+            else:
+                after = (rd, rv, rp, rf, rc)
+                break
+        if before is None or after is None:
+            return None, None, None
+        days_total = (after[0] - before[0]).days
+        if days_total == 0:
+            return 0.0, 0.0, 0.0
+        m3_day  = (after[1] - before[1]) / days_total
+        kwh_day = calcular_kwh(m3_day, after[3])
+        cost_day = round(kwh_day * after[2] + after[4] / 30.44, 6)
+        return round(m3_day, 4), round(kwh_day, 4), round(cost_day, 4)
+
+    labels, m3_dia, kwh_dia, coste_dia = [], [], [], []
+    cur = date_start
+    while cur <= date_end:
+        m3, kwh, coste = interpolate_daily(cur)
+        if m3 is not None:
+            labels.append(cur.strftime("%Y-%m-%d"))
+            m3_dia.append(m3)
+            kwh_dia.append(kwh)
+            coste_dia.append(coste)
+        cur += timedelta(days=1)
+
+    return {"labels": labels, "m3_dia": m3_dia, "kwh_dia": kwh_dia, "coste_dia": coste_dia}
 
 @app.delete("/api/lecturas/{lid}")
 async def api_delete(lid: int):
